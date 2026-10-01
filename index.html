@@ -26,6 +26,8 @@ h1{font:600 34px/1.2 Newsreader,Georgia,serif;margin:0 0 24px}
 .post a:hover{text-decoration:underline}
 .post p{margin:6px 0 0;color:var(--muted)}
 .date{font-size:13px;color:var(--muted)}
+.post a.ed,a.ed{font:500 14px 'Public Sans',sans-serif;margin-left:12px;color:var(--muted)}
+figure{margin:0 0 1.2em}img{max-width:100%;height:auto;border-radius:6px;display:block}
 .body p{font:18px/1.75 Newsreader,Georgia,serif;margin:0 0 1.1em}
 .row{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:8px}
 button,.btn{font:500 15px "Public Sans",sans-serif;background:var(--accent);color:#fff;border:0;border-radius:6px;padding:9px 16px;cursor:pointer}
@@ -93,7 +95,12 @@ function merge(remote, local){
 async function loadPosts(){
   let remote = [];
   try{ const r = await fetch(CONFIG.file + "?t=" + Date.now()); if(r.ok) remote = await r.json(); }catch(e){}
-  posts = merge(remote, store.get("entropia_local_posts", []));
+  const local = store.get("entropia_local_posts", []).filter(l => {
+    const r = remote.find(x => x.id === l.id);
+    return !(r && JSON.stringify(r) === JSON.stringify(l));
+  });
+  store.set("entropia_local_posts", local);
+  posts = merge(remote, local);
 }
 const fmt = d => new Date(d).toLocaleDateString("en-GB", {year:"numeric", month:"long", day:"numeric"});
 
@@ -102,49 +109,62 @@ function renderPosts(){
     <article class="post">
       <a href="#/post/${esc(p.id)}">${esc(p.title)}</a>
       <p>${esc(p.summary || "")}</p>
-      <span class="date">${fmt(p.date)}</span>
+      <span class="date">${fmt(p.date)}</span>${isAdmin ? `<a class="ed" href="#/edit/${esc(p.id)}">Edit</a>` : ""}
     </article>`).join("") : `<p>No posts yet.${isAdmin ? " Use New post to write the first one." : ""}</p>`;
   view.innerHTML = `<div class="row"><h1>Posts</h1>${isAdmin ? '<button id="new-post" type="button">New post</button>' : ""}</div>${list}`;
-  const nb = $("#new-post"); if(nb) nb.onclick = renderEditor;
+  const nb = $("#new-post"); if(nb) nb.onclick = () => renderEditor();
+}
+function renderBody(t){
+  return esc(t).split(/\n{2,}/).map(x => {
+    const m = x.trim().match(/^!\[([^\]]*)\]\((images\/[\w.\-]+)\)$/);
+    if(m) return `<figure><img src="${m[2]}" alt="${m[1]}" loading="lazy"></figure>`;
+    return `<p>${x.replace(/\n/g, "<br>")}</p>`;
+  }).join("");
 }
 function renderPost(id){
   const p = posts.find(x => x.id === id);
   if(!p){ view.innerHTML = "<h1>Post not found</h1><p><a href='#/'>Back to posts</a></p>"; return; }
-  const body = esc(p.body).split(/\n{2,}/).map(x => `<p>${x.replace(/\n/g, "<br>")}</p>`).join("");
-  view.innerHTML = `<p><a href="#/">Back to posts</a></p><h1>${esc(p.title)}</h1><p class="date">${fmt(p.date)}</p><div class="body">${body}</div>`;
+  view.innerHTML = `<p><a href="#/">Back to posts</a>${isAdmin ? `<a class="ed" href="#/edit/${esc(p.id)}">Edit post</a>` : ""}</p><h1>${esc(p.title)}</h1><p class="date">${fmt(p.date)}</p><div class="body">${renderBody(p.body)}</div>`;
 }
 function renderAbout(){
   view.innerHTML = `<h1>About Mohammad</h1><div class="body">
     <p>Hi, I'm Mohammad. Entropia is where I write about what I'm learning and building.</p>
     <p>Edit this text in <code>index.html</code> (search for renderAbout) to tell your own story.</p></div>`;
 }
-function renderEditor(){
+let editing = null;
+function renderEditor(p){
   if(!isAdmin){ return renderPosts(); }
+  editing = (p && p.id) ? p : null;
   const t = store.get("entropia_token", "");
-  view.innerHTML = `<h1>New post</h1><div class="panel">
-    <label for="f-title">Title</label><input id="f-title" maxlength="140">
-    <label for="f-sum">Short summary</label><input id="f-sum" maxlength="200">
-    <label for="f-body">Body (blank line = new paragraph)</label><textarea id="f-body"></textarea>
+  view.innerHTML = `<h1>${editing ? "Edit post" : "New post"}</h1><div class="panel">
+    <label for="f-title">Title</label><input id="f-title" maxlength="140" value="${esc(editing ? editing.title : "")}">
+    <label for="f-sum">Short summary</label><input id="f-sum" maxlength="200" value="${esc(editing ? editing.summary || "" : "")}">
+    <label for="f-body">Body (blank line = new paragraph)</label><textarea id="f-body">${esc(editing ? editing.body : "")}</textarea>
+    <div class="row" style="margin-top:8px"><button class="ghost" id="photo-btn" type="button">Add photo</button>
+    <input id="photo" type="file" accept="image/*" hidden></div>
     <details ${t ? "" : "open"}><summary>GitHub sync (so posts are saved for every visitor)</summary>
       <label for="f-token">GitHub token (fine-grained, Contents: read and write, this repo only)</label>
       <input id="f-token" type="password" autocomplete="off" value="${esc(t)}">
     </details>
     <div class="row" style="margin-top:18px"><button id="save" type="button">Publish</button><button class="ghost" id="cancel" type="button">Cancel</button></div>
     <div class="msg" id="msg" role="status"></div></div>`;
-  $("#cancel").onclick = () => renderPosts();
+  $("#cancel").onclick = () => { location.hash = "#/"; renderRoute(); };
   $("#save").onclick = savePost;
+  $("#photo-btn").onclick = () => $("#photo").click();
+  $("#photo").onchange = e => { if(e.target.files[0]) addPhoto(e.target.files[0]); e.target.value = ""; };
 }
 async function savePost(){
   const title = $("#f-title").value.trim(), body = $("#f-body").value.trim(), msg = $("#msg");
   const token = $("#f-token").value.trim();
   if(!title || !body){ msg.className = "msg err"; msg.textContent = "Add a title and a body before publishing."; return; }
   const post = {
-    id: Date.now().toString(36), title, summary: $("#f-sum").value.trim(),
-    body, date: new Date().toISOString().slice(0, 10)
+    id: editing ? editing.id : Date.now().toString(36), title, summary: $("#f-sum").value.trim(),
+    body, date: editing ? editing.date : new Date().toISOString().slice(0, 10)
   };
-  const local = store.get("entropia_local_posts", []); local.push(post); store.set("entropia_local_posts", local);
+  const local = store.get("entropia_local_posts", []).filter(p => p.id !== post.id); local.push(post); store.set("entropia_local_posts", local);
   store.set("entropia_token", token);
   posts = merge(posts, [post]);
+  editing = post;
   if(!token || CONFIG.owner.startsWith("YOUR_")){
     msg.className = "msg ok";
     msg.textContent = "Saved in this browser. Add a GitHub token and fill in CONFIG to save for all visitors.";
@@ -152,8 +172,7 @@ async function savePost(){
   }
   msg.className = "msg"; msg.textContent = "Saving to GitHub...";
   try{
-    await pushToGitHub(token);
-    store.set("entropia_local_posts", local.filter(p => p.id !== post.id));
+    await pushToGitHub(token, [post]);
     msg.className = "msg ok"; msg.textContent = "Published to GitHub. The site updates in about a minute.";
     setTimeout(() => { location.hash = "#/"; renderRoute(); }, 1500);
   }catch(e){
@@ -161,7 +180,27 @@ async function savePost(){
     msg.textContent = "GitHub save failed (" + e.message + "). The post is still saved in this browser.";
   }
 }
-async function pushToGitHub(token){
+async function addPhoto(file){
+  const msg = $("#msg"), token = $("#f-token").value.trim();
+  if(!token || CONFIG.owner.startsWith("YOUR_")){
+    msg.className = "msg err"; msg.textContent = "Photos need GitHub sync. Fill in CONFIG and add your token first."; return;
+  }
+  msg.className = "msg"; msg.textContent = "Uploading photo...";
+  try{
+    const bmp = await createImageBitmap(file), sc = Math.min(1, 1400 / bmp.width);
+    const c = document.createElement("canvas"); c.width = Math.round(bmp.width * sc); c.height = Math.round(bmp.height * sc);
+    c.getContext("2d").drawImage(bmp, 0, 0, c.width, c.height);
+    const name = "images/" + Date.now().toString(36) + ".jpg";
+    const r = await fetch(`https://api.github.com/repos/${CONFIG.owner}/${CONFIG.repo}/contents/${name}`, {
+      method: "PUT", headers: { Authorization: "Bearer " + token, Accept: "application/vnd.github+json" },
+      body: JSON.stringify({ message: "Add photo", content: c.toDataURL("image/jpeg", 0.85).split(",")[1], branch: CONFIG.branch }) });
+    if(!r.ok) throw new Error("write " + r.status);
+    const ta = $("#f-body"), i = ta.selectionStart;
+    ta.value = ta.value.slice(0, i) + `\n\n![](${name})\n\n` + ta.value.slice(ta.selectionEnd);
+    msg.className = "msg ok"; msg.textContent = "Photo added. Publish the post to show it.";
+  }catch(e){ msg.className = "msg err"; msg.textContent = "Photo upload failed (" + e.message + ")."; }
+}
+async function pushToGitHub(token, items){
   const api = `https://api.github.com/repos/${CONFIG.owner}/${CONFIG.repo}/contents/${CONFIG.file}`;
   const h = { Authorization: "Bearer " + token, Accept: "application/vnd.github+json" };
   let sha, remote = [];
@@ -170,7 +209,7 @@ async function pushToGitHub(token){
     const j = await g.json(); sha = j.sha;
     remote = JSON.parse(decodeURIComponent(escape(atob(j.content.replace(/\n/g, "")))));
   } else if(g.status !== 404){ throw new Error("read " + g.status); }
-  const all = merge(remote, posts.filter(p => !remote.some(r => r.id === p.id)));
+  const all = merge(remote, items);
   const content = btoa(unescape(encodeURIComponent(JSON.stringify(all, null, 2))));
   const r = await fetch(api, { method: "PUT", headers: h,
     body: JSON.stringify({ message: "Add post", content, sha, branch: CONFIG.branch }) });
@@ -205,6 +244,7 @@ function renderRoute(){
   $("#n-posts").classList.toggle("on", h === "#/" || h.startsWith("#/post"));
   $("#n-about").classList.toggle("on", h === "#/about");
   if(h === "#/about") renderAbout();
+  else if(h.startsWith("#/edit/")) renderEditor(posts.find(x => x.id === h.slice(7)));
   else if(h.startsWith("#/post/")) renderPost(h.slice(7));
   else renderPosts();
   window.scrollTo(0, 0);
