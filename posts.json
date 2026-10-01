@@ -1,0 +1,9 @@
+[
+  {
+    "id": "welcome",
+    "title": "Welcome to Entropia",
+    "summary": "The first post on the blog.",
+    "body": "This is the first post on Entropia.\n\nLog in as admin from the footer to write new posts.",
+    "date": "2026-10-01"
+  }
+]

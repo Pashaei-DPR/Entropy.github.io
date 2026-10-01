@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Entropia</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='8' cy='8' r='3' fill='%230F6E8C'/%3E%3Ccircle cx='8' cy='24' r='3' fill='%230F6E8C'/%3E%3Ccircle cx='20' cy='10' r='3' fill='%230F6E8C' opacity='.6'/%3E%3Ccircle cx='26' cy='22' r='3' fill='%230F6E8C' opacity='.3'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:wght@400;600&family=Public+Sans:wght@400;500&display=swap">
+<style>
+:root{--bg:#F5F7F8;--ink:#14202B;--muted:#5B6B78;--accent:#0F6E8C;--line:#D5DDE2;--card:#fff;box-sizing:border-box}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#0F171E;--ink:#E6EDF2;--muted:#93A3AF;--accent:#5CC0DE;--line:#26343F;--card:#16212A}}
+*{box-sizing:inherit}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 "Public Sans",system-ui,sans-serif}
+.wrap{max-width:720px;margin:0 auto;padding:0 20px}
+header{border-bottom:1px solid var(--line)}
+.bar{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:18px 0;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px;color:var(--ink);text-decoration:none;font:600 26px/1 Newsreader,Georgia,serif}
+nav{display:flex;gap:22px;align-items:center}
+nav a{color:var(--muted);text-decoration:none;padding:4px 0;border-bottom:2px solid transparent}
+nav a:hover,nav a.on{color:var(--ink);border-color:var(--accent)}
+a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+main{padding:36px 0 60px;min-height:60vh}
+h1{font:600 34px/1.2 Newsreader,Georgia,serif;margin:0 0 24px}
+.post{padding:18px 0;border-bottom:1px solid var(--line)}
+.post a{font:600 21px/1.3 Newsreader,Georgia,serif;color:var(--accent);text-decoration:none}
+.post a:hover{text-decoration:underline}
+.post p{margin:6px 0 0;color:var(--muted)}
+.date{font-size:13px;color:var(--muted)}
+.body p{font:18px/1.75 Newsreader,Georgia,serif;margin:0 0 1.1em}
+.row{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:8px}
+button,.btn{font:500 15px "Public Sans",sans-serif;background:var(--accent);color:#fff;border:0;border-radius:6px;padding:9px 16px;cursor:pointer}
+button.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
+label{display:block;margin:14px 0 4px;font-weight:500}
+input,textarea{width:100%;font:inherit;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:6px;padding:9px 11px}
+textarea{min-height:260px;resize:vertical}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:20px;margin-bottom:28px}
+.msg{margin-top:12px;font-size:14px}.err{color:#C0392B}.ok{color:var(--accent)}
+footer{border-top:1px solid var(--line);padding:20px 0;color:var(--muted);font-size:14px}
+footer button{background:none;color:var(--muted);padding:0;text-decoration:underline}
+details{margin-top:16px;color:var(--muted);font-size:14px}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<header><div class="wrap bar">
+  <a class="brand" href="#/" aria-label="Entropia home">
+    <svg width="40" height="32" viewBox="0 0 40 32" aria-hidden="true">
+      <g fill="#0F6E8C">
+        <circle cx="5" cy="6" r="2.6"/><circle cx="5" cy="16" r="2.6"/><circle cx="5" cy="26" r="2.6"/>
+        <circle cx="15" cy="6" r="2.6"/><circle cx="15" cy="16" r="2.6"/><circle cx="16" cy="27" r="2.6" opacity=".8"/>
+        <circle cx="25" cy="4" r="2.6" opacity=".7"/><circle cx="26" cy="18" r="2.6" opacity=".6"/><circle cx="23" cy="28" r="2.6" opacity=".5"/>
+        <circle cx="35" cy="9" r="2.6" opacity=".4"/><circle cx="33" cy="23" r="2.6" opacity=".3"/><circle cx="37" cy="29" r="2.6" opacity=".2"/>
+      </g>
+    </svg>
+    <span>Entropia</span>
+  </a>
+  <nav><a href="#/" id="n-posts">Posts</a><a href="#/about" id="n-about">About Mohammad</a></nav>
+</div></header>
+
+<main class="wrap" id="view"></main>
+
+<footer><div class="wrap">
+  <span id="foot-status"></span>
+  <button id="admin-btn" type="button">Admin</button>
+</div></footer>
+
+<script>
+/* ===== CONFIG: fill these in after you create your GitHub repo ===== */
+const CONFIG = { owner: "YOUR_GITHUB_USERNAME", repo: "YOUR_REPO_NAME", branch: "main", file: "posts.json" };
+
+/* Salted SHA-256 of "entropia|username|password". The plaintext is not in this file. */
+const ADMIN_HASH = "10af391f5a30d80f5cf5318d6b28a6c2305e3cc623d77f13dabf240c5d40f08e";
+
+const $ = s => document.querySelector(s);
+const view = $("#view");
+const esc = s => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const store = {
+  get(k, d){ try{ const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; }catch(e){ return d; } },
+  set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
+};
+let posts = [];
+let isAdmin = sessionStorage.getItem("entropia_admin") === "1";
+
+async function sha256(t){
+  const b = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(t));
+  return [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, "0")).join("");
+}
+function merge(remote, local){
+  const m = new Map();
+  [...remote, ...local].forEach(p => m.set(p.id, p));
+  return [...m.values()].sort((a, b) => b.date.localeCompare(a.date));
+}
+async function loadPosts(){
+  let remote = [];
+  try{ const r = await fetch(CONFIG.file + "?t=" + Date.now()); if(r.ok) remote = await r.json(); }catch(e){}
+  posts = merge(remote, store.get("entropia_local_posts", []));
+}
+const fmt = d => new Date(d).toLocaleDateString("en-GB", {year:"numeric", month:"long", day:"numeric"});
+
+function renderPosts(){
+  const list = posts.length ? posts.map(p => `
+    <article class="post">
+      <a href="#/post/${esc(p.id)}">${esc(p.title)}</a>
+      <p>${esc(p.summary || "")}</p>
+      <span class="date">${fmt(p.date)}</span>
+    </article>`).join("") : `<p>No posts yet.${isAdmin ? " Use New post to write the first one." : ""}</p>`;
+  view.innerHTML = `<div class="row"><h1>Posts</h1>${isAdmin ? '<button id="new-post" type="button">New post</button>' : ""}</div>${list}`;
+  const nb = $("#new-post"); if(nb) nb.onclick = renderEditor;
+}
+function renderPost(id){
+  const p = posts.find(x => x.id === id);
+  if(!p){ view.innerHTML = "<h1>Post not found</h1><p><a href='#/'>Back to posts</a></p>"; return; }
+  const body = esc(p.body).split(/\n{2,}/).map(x => `<p>${x.replace(/\n/g, "<br>")}</p>`).join("");
+  view.innerHTML = `<p><a href="#/">Back to posts</a></p><h1>${esc(p.title)}</h1><p class="date">${fmt(p.date)}</p><div class="body">${body}</div>`;
+}
+function renderAbout(){
+  view.innerHTML = `<h1>About Mohammad</h1><div class="body">
+    <p>Hi, I'm Mohammad. Entropia is where I write about what I'm learning and building.</p>
+    <p>Edit this text in <code>index.html</code> (search for renderAbout) to tell your own story.</p></div>`;
+}
+function renderEditor(){
+  if(!isAdmin){ return renderPosts(); }
+  const t = store.get("entropia_token", "");
+  view.innerHTML = `<h1>New post</h1><div class="panel">
+    <label for="f-title">Title</label><input id="f-title" maxlength="140">
+    <label for="f-sum">Short summary</label><input id="f-sum" maxlength="200">
+    <label for="f-body">Body (blank line = new paragraph)</label><textarea id="f-body"></textarea>
+    <details ${t ? "" : "open"}><summary>GitHub sync (so posts are saved for every visitor)</summary>
+      <label for="f-token">GitHub token (fine-grained, Contents: read and write, this repo only)</label>
+      <input id="f-token" type="password" autocomplete="off" value="${esc(t)}">
+    </details>
+    <div class="row" style="margin-top:18px"><button id="save" type="button">Publish</button><button class="ghost" id="cancel" type="button">Cancel</button></div>
+    <div class="msg" id="msg" role="status"></div></div>`;
+  $("#cancel").onclick = () => renderPosts();
+  $("#save").onclick = savePost;
+}
+async function savePost(){
+  const title = $("#f-title").value.trim(), body = $("#f-body").value.trim(), msg = $("#msg");
+  const token = $("#f-token").value.trim();
+  if(!title || !body){ msg.className = "msg err"; msg.textContent = "Add a title and a body before publishing."; return; }
+  const post = {
+    id: Date.now().toString(36), title, summary: $("#f-sum").value.trim(),
+    body, date: new Date().toISOString().slice(0, 10)
+  };
+  const local = store.get("entropia_local_posts", []); local.push(post); store.set("entropia_local_posts", local);
+  store.set("entropia_token", token);
+  posts = merge(posts, [post]);
+  if(!token || CONFIG.owner.startsWith("YOUR_")){
+    msg.className = "msg ok";
+    msg.textContent = "Saved in this browser. Add a GitHub token and fill in CONFIG to save for all visitors.";
+    return;
+  }
+  msg.className = "msg"; msg.textContent = "Saving to GitHub...";
+  try{
+    await pushToGitHub(token);
+    store.set("entropia_local_posts", local.filter(p => p.id !== post.id));
+    msg.className = "msg ok"; msg.textContent = "Published to GitHub. The site updates in about a minute.";
+    setTimeout(() => { location.hash = "#/"; renderRoute(); }, 1500);
+  }catch(e){
+    msg.className = "msg err";
+    msg.textContent = "GitHub save failed (" + e.message + "). The post is still saved in this browser.";
+  }
+}
+async function pushToGitHub(token){
+  const api = `https://api.github.com/repos/${CONFIG.owner}/${CONFIG.repo}/contents/${CONFIG.file}`;
+  const h = { Authorization: "Bearer " + token, Accept: "application/vnd.github+json" };
+  let sha, remote = [];
+  const g = await fetch(api + "?ref=" + CONFIG.branch, { headers: h });
+  if(g.ok){
+    const j = await g.json(); sha = j.sha;
+    remote = JSON.parse(decodeURIComponent(escape(atob(j.content.replace(/\n/g, "")))));
+  } else if(g.status !== 404){ throw new Error("read " + g.status); }
+  const all = merge(remote, posts.filter(p => !remote.some(r => r.id === p.id)));
+  const content = btoa(unescape(encodeURIComponent(JSON.stringify(all, null, 2))));
+  const r = await fetch(api, { method: "PUT", headers: h,
+    body: JSON.stringify({ message: "Add post", content, sha, branch: CONFIG.branch }) });
+  if(!r.ok) throw new Error("write " + r.status);
+}
+
+/* ---- Admin login ---- */
+$("#admin-btn").onclick = () => {
+  if(isAdmin){ isAdmin = false; sessionStorage.removeItem("entropia_admin"); updateFooter(); renderRoute(); return; }
+  view.innerHTML = `<h1>Admin login</h1><div class="panel">
+    <label for="u">Username</label><input id="u" autocomplete="username">
+    <label for="p">Password</label><input id="p" type="password" autocomplete="current-password">
+    <div class="row" style="margin-top:18px"><button id="go" type="button">Log in</button></div>
+    <div class="msg err" id="lmsg" role="alert"></div></div>`;
+  const go = async () => {
+    const h = await sha256(`entropia|${$("#u").value.trim()}|${$("#p").value}`);
+    if(h === ADMIN_HASH){
+      isAdmin = true; sessionStorage.setItem("entropia_admin", "1"); updateFooter(); location.hash = "#/"; renderRoute();
+    } else { $("#lmsg").textContent = "Wrong username or password."; }
+  };
+  $("#go").onclick = go;
+  $("#p").addEventListener("keydown", e => { if(e.key === "Enter") go(); });
+};
+function updateFooter(){
+  $("#admin-btn").textContent = isAdmin ? "Log out" : "Admin";
+  $("#foot-status").textContent = isAdmin ? "Logged in as admin. " : "";
+}
+
+/* ---- Router ---- */
+function renderRoute(){
+  const h = location.hash || "#/";
+  $("#n-posts").classList.toggle("on", h === "#/" || h.startsWith("#/post"));
+  $("#n-about").classList.toggle("on", h === "#/about");
+  if(h === "#/about") renderAbout();
+  else if(h.startsWith("#/post/")) renderPost(h.slice(7));
+  else renderPosts();
+  window.scrollTo(0, 0);
+}
+window.addEventListener("hashchange", renderRoute);
+updateFooter();
+loadPosts().then(renderRoute);
+</script>
+</body>
+</html>
